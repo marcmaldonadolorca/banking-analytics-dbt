@@ -1,0 +1,13 @@
+repayment_status_code,description,months_past_due,delinquency_bucket,bucket_order,is_documented
+-2,No consumption in the month,0,current,1,false
+-1,Paid in full,0,current,1,true
+0,Revolving credit (minimum payment made),0,current,1,false
+1,Payment delayed one month,1,30_dpd,2,true
+2,Payment delayed two months,2,60_dpd,3,true
+3,Payment delayed three months,3,90_plus_dpd,4,true
+4,Payment delayed four months,4,90_plus_dpd,4,true
+5,Payment delayed five months,5,90_plus_dpd,4,true
+6,Payment delayed six months,6,90_plus_dpd,4,true
+7,Payment delayed seven months,7,90_plus_dpd,4,true
+8,Payment delayed eight months,8,90_plus_dpd,4,true
+9,Payment delayed nine months or more,9,90_plus_dpd,4,true

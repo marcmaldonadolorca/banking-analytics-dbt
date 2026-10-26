@@ -1,0 +1,47 @@
+version: 2
+
+seeds:
+  - name: education_levels
+    description: >
+      Decodes the source education code. Codes 0, 5 and 6 occur in the data but are not
+      documented by the source; they are mapped to `unknown` instead of being dropped.
+    columns:
+      - name: education_code
+        description: Code as delivered in `raw.credit_card_clients.education`.
+        data_tests: [unique, not_null]
+      - name: education_level
+        description: Decoded education level.
+        data_tests: [not_null]
+      - name: is_documented
+        description: False for codes absent from the source documentation.
+
+  - name: marital_statuses
+    description: Decodes the source marital status code; code 0 is undocumented and becomes `unknown`.
+    columns:
+      - name: marital_status_code
+        description: Code as delivered in `raw.credit_card_clients.marriage`.
+        data_tests: [unique, not_null]
+      - name: marital_status
+        description: Decoded marital status.
+        data_tests: [not_null]
+      - name: is_documented
+        description: False for codes absent from the source documentation.
+
+  - name: repayment_statuses
+    description: "{{ doc('repayment_status_code') }}"
+    columns:
+      - name: repayment_status_code
+        description: Code as delivered in the monthly `pay_*` columns.
+        data_tests: [unique, not_null]
+      - name: description
+        description: Plain-English meaning of the code.
+      - name: months_past_due
+        description: Months past due implied by the code (0 when not late).
+        data_tests: [not_null]
+      - name: delinquency_bucket
+        description: "{{ doc('delinquency_bucket') }}"
+        data_tests: [not_null]
+      - name: bucket_order
+        description: Sort order of the bucket, from best (1) to worst (4).
+      - name: is_documented
+        description: False for codes -2 and 0, which the source does not describe.

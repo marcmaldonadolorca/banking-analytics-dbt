@@ -1,0 +1,92 @@
+version: 2
+
+models:
+  - name: monthly_portfolio_kpis
+    description: >
+      Portfolio health by statement month: balances (average monthly balance per account),
+      utilisation, payment rate and delinquency rates at 30/60/90+ days past due.
+    columns:
+      - name: statement_month
+        description: Statement month. Primary key.
+        data_tests: [unique, not_null]
+      - name: accounts
+        description: Accounts with a statement in the month.
+      - name: accounts_with_balance
+        description: Accounts whose statement balance is positive.
+      - name: total_balance_ntd
+        description: Sum of statement balances, NT$.
+      - name: avg_balance_ntd
+        description: Average statement balance per account (average monthly balance), NT$.
+      - name: avg_utilization_ratio
+        description: Average utilisation across accounts.
+      - name: payment_rate
+        description: >
+          Payments made in the month by accounts that had a positive balance last month,
+          divided by that balance. Null for April 2005 (no previous statement).
+      - name: delinquent_30p_accounts
+        description: Accounts at least 30 days past due.
+      - name: delinquent_60p_accounts
+        description: Accounts at least 60 days past due.
+      - name: delinquent_90p_accounts
+        description: Accounts at least 90 days past due.
+      - name: delinquency_rate_30p
+        description: >
+          Share of accounts 30+ days past due. Read trends on April-August only: the source
+          codes September differently (status 1 is almost absent before it; see README).
+      - name: delinquency_rate_60p
+        description: Share of accounts 60+ days past due (same September caveat).
+      - name: delinquency_rate_90p
+        description: Share of accounts 90+ days past due.
+
+  - name: delinquency_roll_rates
+    description: >
+      Month-over-month transition matrix between collections buckets. Grain: statement month x
+      bucket last month x bucket this month. Roll rates within a month and origin bucket sum to 1.
+    data_tests:
+      - unique_combination_of_columns:
+          arguments: {combination_of_columns: [statement_month, from_bucket, to_bucket]}
+    columns:
+      - name: statement_month
+        description: Month of the destination statement (May-September 2005).
+        data_tests: [not_null]
+      - name: from_bucket
+        description: "Bucket on the previous statement. {{ doc('delinquency_bucket') }}"
+        data_tests: [not_null]
+      - name: to_bucket
+        description: Bucket on this statement.
+        data_tests: [not_null]
+      - name: transition_type
+        description: roll_forward (worse bucket), cure (better bucket) or stay.
+        data_tests:
+          - accepted_values:
+              arguments: {values: [roll_forward, cure, stay]}
+      - name: accounts
+        description: Accounts making this transition.
+      - name: from_bucket_accounts
+        description: Accounts in the origin bucket last month.
+      - name: roll_rate
+        description: accounts / from_bucket_accounts.
+
+  - name: default_rate_by_segment
+    description: >
+      October 2005 default rate by segment, in long format (segment_type, segment_value) so a
+      BI tool can filter one segmentation at a time. Each segment_type partitions the portfolio.
+    data_tests:
+      - unique_combination_of_columns:
+          arguments: {combination_of_columns: [segment_type, segment_value]}
+    columns:
+      - name: segment_type
+        description: Segmentation used (portfolio, worst_delinquency_6m, credit_limit_band, age_band, education_level).
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments: {values: [portfolio, worst_delinquency_6m, credit_limit_band, age_band, education_level]}
+      - name: segment_value
+        description: Segment within the segmentation.
+        data_tests: [not_null]
+      - name: customers
+        description: Clients in the segment.
+      - name: defaults
+        description: Clients in the segment who defaulted.
+      - name: default_rate
+        description: defaults / customers.

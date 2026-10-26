@@ -1,0 +1,12 @@
+# Python
+.venv/
+__pycache__/
+
+# dbt
+target/
+dbt_packages/
+logs/
+.user.yml
+
+# Local warehouse and downloaded raw files (rebuilt by scripts/load_raw.py)
+data/

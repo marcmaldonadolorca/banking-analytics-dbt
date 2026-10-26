@@ -1,0 +1,102 @@
+version: 2
+
+models:
+  - name: int_card_statements_unpivoted
+    description: >
+      The six wide monthly column sets turned into one row per client and statement month,
+      enriched with the previous month's balance and status and with utilisation.
+    data_tests:
+      - unique_combination_of_columns:
+          arguments: {combination_of_columns: [customer_id, statement_month]}
+    columns:
+      - name: customer_id
+        description: Client identifier.
+        data_tests: [not_null]
+      - name: statement_month
+        description: First day of the statement month (April-September 2005).
+        data_tests: [not_null]
+      - name: repayment_status_code
+        description: "{{ doc('repayment_status_code') }}"
+        data_tests:
+          - not_null
+          - relationships:
+              arguments: {to: ref('repayment_statuses'), field: repayment_status_code}
+      - name: previous_repayment_status_code
+        description: Repayment status of the previous statement; null for the first month.
+      - name: months_past_due
+        description: Months past due implied by the status (0 for codes -2, -1 and 0).
+        data_tests: [not_null]
+      - name: credit_limit_ntd
+        description: "{{ doc('credit_limit_ntd') }}"
+      - name: bill_amount_ntd
+        description: Statement balance, NT$. Negative means a credit balance.
+      - name: previous_bill_amount_ntd
+        description: Statement balance of the previous month; null for the first month.
+      - name: payment_amount_ntd
+        description: "{{ doc('payment_amount_ntd') }}"
+      - name: utilization_ratio
+        description: "{{ doc('utilization_ratio') }}"
+
+  - name: int_customer_risk_profile
+    description: Behaviour of each client over the six-month observation window.
+    columns:
+      - name: customer_id
+        description: Client identifier.
+        data_tests: [unique, not_null]
+      - name: statement_count
+        description: Number of monthly statements observed (6 for a complete history).
+      - name: last_statement_month
+        description: Last statement month observed for the client.
+      - name: worst_months_past_due_6m
+        description: Highest months-past-due reached in the window.
+      - name: months_delinquent_6m
+        description: Number of statements at least 30 days past due.
+      - name: avg_utilization_ratio_6m
+        description: Average monthly utilisation over the window.
+      - name: total_payments_6m_ntd
+        description: Sum of payments over the window, NT$.
+      - name: latest_repayment_status_code
+        description: Repayment status of the most recent statement.
+      - name: worst_delinquency_6m
+        description: Worst delinquency reached in the window, as a segment label.
+        data_tests:
+          - accepted_values:
+              arguments: {values: [never_delinquent, max_30_dpd, max_60_dpd, max_90_plus_dpd]}
+
+unit_tests:
+  - name: test_unpivot_months_history_and_utilization
+    description: >
+      Each wide column set lands on its own month, the previous month's balance and status
+      come from the prior statement, and a negative balance counts as zero utilisation.
+    model: int_card_statements_unpivoted
+    given:
+      - input: ref('stg_uci__credit_card_clients')
+        rows:
+          - {customer_id: 1, credit_limit_ntd: 1000,
+             repayment_status_2005_04: -1, repayment_status_2005_05: 0, repayment_status_2005_06: 0,
+             repayment_status_2005_07: 1, repayment_status_2005_08: 2, repayment_status_2005_09: 3,
+             bill_amount_2005_04: -50, bill_amount_2005_05: 100, bill_amount_2005_06: 200,
+             bill_amount_2005_07: 300, bill_amount_2005_08: 400, bill_amount_2005_09: 1200,
+             payment_amount_2005_04: 0, payment_amount_2005_05: 0, payment_amount_2005_06: 10,
+             payment_amount_2005_07: 20, payment_amount_2005_08: 30, payment_amount_2005_09: 40}
+      - input: ref('repayment_statuses')
+        rows:
+          - {repayment_status_code: -1, months_past_due: 0}
+          - {repayment_status_code: 0, months_past_due: 0}
+          - {repayment_status_code: 1, months_past_due: 1}
+          - {repayment_status_code: 2, months_past_due: 2}
+          - {repayment_status_code: 3, months_past_due: 3}
+    expect:
+      rows:
+        - {statement_month: 2005-04-01, repayment_status_code: -1, previous_repayment_status_code: null,
+           months_past_due: 0, bill_amount_ntd: -50, previous_bill_amount_ntd: null, utilization_ratio: 0.0}
+        - {statement_month: 2005-05-01, repayment_status_code: 0, previous_repayment_status_code: -1,
+           months_past_due: 0, bill_amount_ntd: 100, previous_bill_amount_ntd: -50, utilization_ratio: 0.1}
+        - {statement_month: 2005-06-01, repayment_status_code: 0, previous_repayment_status_code: 0,
+           months_past_due: 0, bill_amount_ntd: 200, previous_bill_amount_ntd: 100, utilization_ratio: 0.2}
+        - {statement_month: 2005-07-01, repayment_status_code: 1, previous_repayment_status_code: 0,
+           months_past_due: 1, bill_amount_ntd: 300, previous_bill_amount_ntd: 200, utilization_ratio: 0.3}
+        - {statement_month: 2005-08-01, repayment_status_code: 2, previous_repayment_status_code: 1,
+           months_past_due: 2, bill_amount_ntd: 400, previous_bill_amount_ntd: 300, utilization_ratio: 0.4}
+        - {statement_month: 2005-09-01, repayment_status_code: 3, previous_repayment_status_code: 2,
+           months_past_due: 3, bill_amount_ntd: 1200, previous_bill_amount_ntd: 400, utilization_ratio: 1.2}

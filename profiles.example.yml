@@ -1,0 +1,21 @@
+# Copy to ~/.dbt/profiles.yml (or pass --profiles-dir) and pick a target with --target.
+# No credentials live in this file: BigQuery uses Application Default Credentials
+# (`gcloud auth application-default login`) or a service account provided by the runner.
+banking_analytics:
+  target: dev
+  outputs:
+    dev:
+      type: duckdb
+      path: "{{ env_var('DUCKDB_PATH', 'data/banking.duckdb') }}"
+      threads: 4
+
+    # bigquery:
+    #   type: bigquery
+    #   method: oauth                      # ADC; no keyfile in the repo
+    #   project: "{{ env_var('GCP_PROJECT') }}"
+    #   dataset: banking_analytics         # custom schemas become banking_analytics_staging, ...
+    #   location: EU
+    #   threads: 8
+    #   job_execution_timeout_seconds: 300
+    #   # Requires `pip install dbt-bigquery` and the raw table loaded as `raw.credit_card_clients`
+    #   # in the same project (e.g. with `bq load --autodetect`).

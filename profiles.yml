@@ -1,0 +1,9 @@
+# Local, credential-free profile. dbt picks it up from the project directory.
+# See profiles.example.yml for a BigQuery target.
+banking_analytics:
+  target: dev
+  outputs:
+    dev:
+      type: duckdb
+      path: "{{ env_var('DUCKDB_PATH', 'data/banking.duckdb') }}"
+      threads: 4

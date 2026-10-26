@@ -1,0 +1,95 @@
+version: 2
+
+models:
+  - name: stg_uci__credit_card_clients
+    description: >
+      Typed and renamed copy of the raw extract, one row per client. Monthly columns keep the
+      wide layout of the source but are named by statement month, which removes the
+      pay_0/bill_amt1 numbering trap once. Codes are decoded downstream through seeds.
+    columns:
+      - name: customer_id
+        description: Client identifier (source `id`). Primary key.
+        data_tests: [unique, not_null]
+      - name: credit_limit_ntd
+        description: "{{ doc('credit_limit_ntd') }}"
+        data_tests: [not_null]
+      - name: sex
+        description: Decoded sex of the client.
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments: {values: [male, female]}
+      - name: education_code
+        description: Raw education code; decoded by the `education_levels` seed.
+        data_tests:
+          - relationships:
+              arguments: {to: ref('education_levels'), field: education_code}
+      - name: marital_status_code
+        description: Raw marital status code; decoded by the `marital_statuses` seed.
+        data_tests:
+          - relationships:
+              arguments: {to: ref('marital_statuses'), field: marital_status_code}
+      - name: age_years
+        description: Age of the client in years.
+        data_tests: [not_null]
+      - name: repayment_status_2005_09
+        description: "Repayment status of the September 2005 statement (source `pay_0`). {{ doc('repayment_status_code') }}"
+      - name: repayment_status_2005_08
+        description: Repayment status, August 2005 (source `pay_2`).
+      - name: repayment_status_2005_07
+        description: Repayment status, July 2005 (source `pay_3`).
+      - name: repayment_status_2005_06
+        description: Repayment status, June 2005 (source `pay_4`).
+      - name: repayment_status_2005_05
+        description: Repayment status, May 2005 (source `pay_5`).
+      - name: repayment_status_2005_04
+        description: Repayment status, April 2005 (source `pay_6`).
+      - name: bill_amount_2005_09
+        description: Statement balance, September 2005 (source `bill_amt1`), NT$.
+      - name: bill_amount_2005_08
+        description: Statement balance, August 2005 (source `bill_amt2`), NT$.
+      - name: bill_amount_2005_07
+        description: Statement balance, July 2005 (source `bill_amt3`), NT$.
+      - name: bill_amount_2005_06
+        description: Statement balance, June 2005 (source `bill_amt4`), NT$.
+      - name: bill_amount_2005_05
+        description: Statement balance, May 2005 (source `bill_amt5`), NT$.
+      - name: bill_amount_2005_04
+        description: Statement balance, April 2005 (source `bill_amt6`), NT$.
+      - name: payment_amount_2005_09
+        description: Amount paid in September 2005 (source `pay_amt1`), NT$.
+      - name: payment_amount_2005_08
+        description: Amount paid in August 2005 (source `pay_amt2`), NT$.
+      - name: payment_amount_2005_07
+        description: Amount paid in July 2005 (source `pay_amt3`), NT$.
+      - name: payment_amount_2005_06
+        description: Amount paid in June 2005 (source `pay_amt4`), NT$.
+      - name: payment_amount_2005_05
+        description: Amount paid in May 2005 (source `pay_amt5`), NT$.
+      - name: payment_amount_2005_04
+        description: Amount paid in April 2005 (source `pay_amt6`), NT$.
+      - name: defaulted_next_month
+        description: True if the client defaulted on the October 2005 payment.
+        data_tests: [not_null]
+      - name: loaded_at
+        description: When the raw row was landed.
+
+unit_tests:
+  - name: test_stg_maps_source_columns_to_the_right_month
+    description: >
+      pay_0 (not pay_1) and bill_amt1/pay_amt1 are September; pay_6, bill_amt6 and pay_amt6
+      are April. A shifted mapping would silently corrupt every downstream metric.
+    model: stg_uci__credit_card_clients
+    given:
+      - input: source('uci', 'credit_card_clients')
+        rows:
+          - {id: 7, limit_bal: 50000, sex: 2, education: 1, marriage: 2, age: 30,
+             pay_0: 2, pay_2: 1, pay_3: 0, pay_4: 0, pay_5: -1, pay_6: -2,
+             bill_amt1: 900, bill_amt2: 800, bill_amt3: 700, bill_amt4: 600, bill_amt5: 500, bill_amt6: 400,
+             pay_amt1: 90, pay_amt2: 80, pay_amt3: 70, pay_amt4: 60, pay_amt5: 50, pay_amt6: 40,
+             default_payment_next_month: 1}
+    expect:
+      rows:
+        - {customer_id: 7, sex: female, repayment_status_2005_09: 2, repayment_status_2005_08: 1,
+           repayment_status_2005_04: -2, bill_amount_2005_09: 900, bill_amount_2005_04: 400,
+           payment_amount_2005_09: 90, payment_amount_2005_04: 40, defaulted_next_month: true}

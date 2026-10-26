@@ -1,0 +1,31 @@
+name: banking_analytics
+version: "1.0.0"
+profile: banking_analytics
+
+clean-targets: ["target", "dbt_packages", "logs"]
+
+models:
+  banking_analytics:
+    staging:
+      +materialized: view
+      +schema: staging
+    intermediate:
+      +materialized: view
+      +schema: intermediate
+    marts:
+      +materialized: table
+      +schema: marts
+
+seeds:
+  banking_analytics:
+    +schema: reference
+    # Pin the join keys' type; everything else is inferred.
+    education_levels:
+      +column_types: {education_code: integer}
+    marital_statuses:
+      +column_types: {marital_status_code: integer}
+    repayment_statuses:
+      +column_types: {repayment_status_code: integer, months_past_due: integer}
+
+flags:
+  send_anonymous_usage_stats: false

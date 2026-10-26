@@ -1,0 +1,191 @@
+version: 2
+
+models:
+  - name: dim_customer
+    description: One row per client with decoded demographics and segmentation bands.
+    columns:
+      - name: customer_id
+        description: Client identifier. Primary key (the source id is stable, so no surrogate key).
+        data_tests: [unique, not_null]
+      - name: sex
+        description: Sex of the client.
+        data_tests:
+          - accepted_values:
+              arguments: {values: [male, female]}
+      - name: age_years
+        description: Age in years.
+      - name: age_band
+        description: Age band used for segmentation.
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments: {values: [under_30, '30_39', '40_49', '50_59', 60_plus]}
+      - name: education_level
+        description: Decoded education level; undocumented source codes become `unknown`.
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments: {values: [graduate_school, university, high_school, other, unknown]}
+      - name: marital_status
+        description: Decoded marital status; undocumented source codes become `unknown`.
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments: {values: [married, single, other, unknown]}
+      - name: credit_limit_ntd
+        description: "{{ doc('credit_limit_ntd') }}"
+      - name: credit_limit_band
+        description: Credit limit band (NT$) used for segmentation.
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments: {values: [under_50k, 50k_150k, 150k_300k, 300k_plus]}
+
+  - name: dim_date
+    description: Daily calendar for 2005. Facts reference it by the first day of the month.
+    columns:
+      - name: date_day
+        description: Calendar date. Primary key.
+        data_tests: [unique, not_null]
+      - name: year_number
+        description: Calendar year.
+      - name: quarter_number
+        description: Calendar quarter (1-4).
+      - name: month_number
+        description: Calendar month (1-12).
+      - name: year_month
+        description: Year and month as an integer, e.g. 200509.
+      - name: month_start_date
+        description: First day of the month.
+      - name: month_end_date
+        description: Last day of the month.
+      - name: is_month_start
+        description: True on the first day of the month.
+
+  - name: dim_repayment_status
+    description: Repayment status codes with their collections bucket.
+    columns:
+      - name: repayment_status_code
+        description: "{{ doc('repayment_status_code') }}"
+        data_tests: [unique, not_null]
+      - name: description
+        description: Plain-English meaning of the code.
+      - name: months_past_due
+        description: Months past due implied by the code.
+      - name: delinquency_bucket
+        description: "{{ doc('delinquency_bucket') }}"
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments: {values: [current, 30_dpd, 60_dpd, 90_plus_dpd]}
+      - name: bucket_order
+        description: Sort order of the bucket, from best (1) to worst (4).
+      - name: is_documented
+        description: False for codes that appear in the data but are not described by the source.
+
+  - name: fct_card_statements
+    description: >
+      Periodic snapshot fact. Grain: one row per client per monthly statement
+      (30,000 clients x 6 months). Incremental: each run merges the latest month again.
+    data_tests:
+      - unique_combination_of_columns:
+          arguments: {combination_of_columns: [customer_id, statement_month]}
+    columns:
+      - name: customer_id
+        description: Client. Foreign key to `dim_customer`.
+        data_tests:
+          - not_null
+          - relationships:
+              arguments: {to: ref('dim_customer'), field: customer_id}
+      - name: statement_month
+        description: First day of the statement month. Foreign key to `dim_date`.
+        data_tests:
+          - not_null
+          - relationships:
+              arguments: {to: ref('dim_date'), field: date_day}
+      - name: repayment_status_code
+        description: Status of this statement. Foreign key to `dim_repayment_status`.
+        data_tests:
+          - not_null
+          - relationships:
+              arguments: {to: ref('dim_repayment_status'), field: repayment_status_code}
+      - name: previous_repayment_status_code
+        description: >
+          Status of the previous statement (role-playing foreign key to `dim_repayment_status`);
+          null for April 2005.
+        data_tests:
+          - relationships:
+              arguments: {to: ref('dim_repayment_status'), field: repayment_status_code}
+      - name: credit_limit_ntd
+        description: "{{ doc('credit_limit_ntd') }}"
+      - name: bill_amount_ntd
+        description: Statement balance, NT$. Negative means a credit balance.
+        data_tests: [not_null]
+      - name: previous_bill_amount_ntd
+        description: Balance of the previous statement, NT$; null for April 2005.
+      - name: payment_amount_ntd
+        description: "{{ doc('payment_amount_ntd') }}"
+        data_tests: [not_null]
+      - name: utilization_ratio
+        description: "{{ doc('utilization_ratio') }}"
+        data_tests: [not_null]
+      - name: months_past_due
+        description: Months past due on this statement.
+      - name: delinquent_30p_flag
+        description: "{{ doc('delinquent_flags') }}"
+        data_tests:
+          - accepted_values:
+              arguments: {values: [0, 1], quote: false}
+      - name: delinquent_60p_flag
+        description: "{{ doc('delinquent_flags') }}"
+        data_tests:
+          - accepted_values:
+              arguments: {values: [0, 1], quote: false}
+      - name: delinquent_90p_flag
+        description: "{{ doc('delinquent_flags') }}"
+        data_tests:
+          - accepted_values:
+              arguments: {values: [0, 1], quote: false}
+
+  - name: fct_default_outcomes
+    description: >
+      Outcome fact. Grain: one row per client, holding the October 2005 default outcome next to
+      the behaviour observed in the six prior months. Doubles as the feature table for a
+      probability-of-default model.
+    columns:
+      - name: customer_id
+        description: Client. Primary key and foreign key to `dim_customer`.
+        data_tests:
+          - unique
+          - not_null
+          - relationships:
+              arguments: {to: ref('dim_customer'), field: customer_id}
+      - name: outcome_month
+        description: Month in which the outcome is observed. Foreign key to `dim_date`.
+        data_tests:
+          - not_null
+          - relationships:
+              arguments: {to: ref('dim_date'), field: date_day}
+      - name: defaulted_flag
+        description: 1 if the client defaulted on the payment due in `outcome_month`.
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments: {values: [0, 1], quote: false}
+      - name: statement_count
+        description: Statements observed in the window; every client must have all six.
+        data_tests:
+          - accepted_values:
+              arguments: {values: [6], quote: false}
+      - name: latest_repayment_status_code
+        description: Repayment status of the last statement (September 2005).
+      - name: worst_months_past_due_6m
+        description: Highest months past due reached in the window.
+      - name: worst_delinquency_6m
+        description: Worst delinquency reached in the window, as a segment label.
+      - name: months_delinquent_6m
+        description: Statements at least 30 days past due in the window.
+      - name: avg_utilization_ratio_6m
+        description: Average utilisation over the window.
+      - name: total_payments_6m_ntd
+        description: Payments made over the window, NT$.

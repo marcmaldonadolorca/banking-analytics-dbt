@@ -1,0 +1,43 @@
+version: 2
+
+sources:
+  - name: uci
+    description: >
+      "Default of Credit Card Clients" (Yeh, 2009), UCI Machine Learning Repository,
+      DOI 10.24432/C55S3H, CC BY 4.0. Landed by `scripts/load_raw.py` with
+      snake_case column names and no other changes.
+    schema: raw
+    tables:
+      - name: credit_card_clients
+        description: >
+          One row per credit card client of a Taiwanese issuer: demographics, credit limit,
+          six monthly statements (April-September 2005) in wide format and whether the client
+          defaulted on the October 2005 payment. Amounts in New Taiwan dollars (NT$).
+        loaded_at_field: _loaded_at
+        columns:
+          - name: id
+            description: Client identifier in the extract.
+            data_tests: [unique, not_null]
+          - name: sex
+            description: 1 = male, 2 = female.
+            data_tests:
+              - accepted_values:
+                  arguments: {values: [1, 2], quote: false}
+          - name: education
+            description: 1-4 documented; 0, 5 and 6 appear in the data but are undocumented.
+            data_tests:
+              - accepted_values:
+                  arguments: {values: [0, 1, 2, 3, 4, 5, 6], quote: false}
+          - name: marriage
+            description: 1-3 documented; 0 appears in the data but is undocumented.
+            data_tests:
+              - accepted_values:
+                  arguments: {values: [0, 1, 2, 3], quote: false}
+          - name: default_payment_next_month
+            description: 1 if the client defaulted on the October 2005 payment.
+            data_tests:
+              - not_null
+              - accepted_values:
+                  arguments: {values: [0, 1], quote: false}
+          - name: _loaded_at
+            description: Timestamp written by the loader.

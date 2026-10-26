@@ -1,0 +1,5 @@
+marital_status_code,marital_status,is_documented
+0,unknown,false
+1,married,true
+2,single,true
+3,other,true

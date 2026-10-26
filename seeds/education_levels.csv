@@ -1,0 +1,8 @@
+education_code,education_level,is_documented
+0,unknown,false
+1,graduate_school,true
+2,university,true
+3,high_school,true
+4,other,true
+5,unknown,false
+6,unknown,false
