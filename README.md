@@ -171,6 +171,7 @@ Possible next steps: SQLFluff in CI, a model contract on `fct_default_outcomes`,
 ## Layout
 
 ```
+├── .github/workflows/dbt-build.yml   CI: install, load, dbt build, incremental run, docs
 ├── scripts/load_raw.py               download + checksum + land raw table in DuckDB
 ├── seeds/                            code tables (education, marital status, repayment status)
 ├── models/
